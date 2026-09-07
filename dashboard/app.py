@@ -19,6 +19,10 @@ from utils.crypto import encrypt_credential, decrypt_credential
 from utils.queue import enqueue_job, is_redis_available
 from services.subscription_service import check_user_quota, get_user_usage_summary, get_or_create_subscription
 from core.universal_model import ContentTemplateCreate, ImageAssignmentCreate, WebsiteProfileSchema, ContentDocument
+from core.rendering_engine import RenderingEngine
+from utils.logger import get_logger
+
+logger = get_logger("dashboard")
 
 # Initialize app and DB
 init_db()
