@@ -1275,6 +1275,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!c) return;
         try {
             const res    = await fetch("/api/drafts");
+            if (!res.ok) throw new Error(`Draft request failed (${res.status})`);
             const drafts = await res.json();
             if (!Array.isArray(drafts) || drafts.length === 0) {
                 c.innerHTML = `<p style="color:var(--text-secondary);font-size:0.9rem;">No drafts pending review.</p>`;
@@ -1443,7 +1444,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 });
             });
-        } catch (e) {}
+        } catch (e) {
+            c.innerHTML = `<p style="color:#dc3545;">Unable to load drafts. Please refresh and try again.</p>`;
+            console.error("Failed to load drafts", e);
+        }
     }
 
     // ===================================================================

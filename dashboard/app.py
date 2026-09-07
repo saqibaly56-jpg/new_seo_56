@@ -114,6 +114,19 @@ def openseo_page(request: Request):
         openseo_url = "https://app.openseo.so"
     return RedirectResponse(url=openseo_url.rstrip("/"), status_code=307)
 
+@app.get("/seo-beta")
+def seo_beta_page(request: Request):
+    """Open the separately deployed SEO Optimization Beta workspace."""
+    configured_url = os.getenv("SEO_BETA_URL")
+    request_host = (request.url.hostname or "").lower()
+    if configured_url:
+        beta_url = configured_url
+    elif request_host in {"localhost", "127.0.0.1", "::1"}:
+        beta_url = "http://localhost:3002"
+    else:
+        raise HTTPException(status_code=503, detail="SEO_BETA_URL is not configured")
+    return RedirectResponse(url=beta_url.rstrip("/"), status_code=307)
+
 @app.get("/admin")
 def admin_page(user = Depends(require_admin)):
     file_path = os.path.join(STATIC_DIR, 'admin.html')
@@ -512,6 +525,13 @@ def get_drafts(user_id: int = Depends(get_current_user_id)):
                     doc = json.loads(d.document_json)
                 except:
                     pass
+
+            html_content = ""
+            if doc:
+                try:
+                    html_content = RenderingEngine.render_classic_html(ContentDocument(**doc))
+                except Exception as exc:
+                    logger.warning(f"Unable to render draft {d.id}: {exc}")
             
             result.append({
                 "id": d.id,
@@ -519,7 +539,7 @@ def get_drafts(user_id: int = Depends(get_current_user_id)):
                 "provider": d.provider,
                 "status": d.status,
                 "title": doc.get("title", "") if doc else "",
-                "html_content": RenderingEngine.render_classic_html(ContentDocument(**doc)) if doc else "",
+                "html_content": html_content,
                 "created_at": d.created_at.strftime("%Y-%m-%d %H:%M") if d.created_at else None
             })
         return result
