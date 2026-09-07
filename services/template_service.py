@@ -122,7 +122,7 @@ def create_custom_template(user_id: int, payload: ContentTemplateCreate) -> Cont
         db.refresh(tmpl)
         
         for idx, sec_data in enumerate(payload.sections):
-            sec_id = f"sec-{uuid.uuid4().hex[:12]}"
+            sec_id = sec_data.id or f"sec-{uuid.uuid4().hex[:12]}"
             sec = TemplateSection(
                 id=sec_id,
                 template_id=tmpl.id,

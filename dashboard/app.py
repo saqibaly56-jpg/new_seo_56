@@ -394,7 +394,6 @@ def set_user_content_settings(req: ContentSettingsRequest, user_id: int = Depend
 
 # --- TENANT-ISOLATED USER DASHBOARD APIS ---
 
-@app.get("/api/user/jobs")
 @app.delete("/api/user/jobs/clear")
 def clear_user_jobs(user_id: int = Depends(get_current_user_id)):
     with SessionLocal() as db:
@@ -403,6 +402,9 @@ def clear_user_jobs(user_id: int = Depends(get_current_user_id)):
             Job.user_id == user_id,
             Job.status.in_(["COMPLETED", "FAILED", "PENDING_REVIEW"])
         ).all()
+        job_ids = [job.id for job in jobs_to_delete]
+        if job_ids:
+            db.query(JobEvent).filter(JobEvent.job_id.in_(job_ids)).delete(synchronize_session=False)
         for j in jobs_to_delete:
             db.delete(j)
         db.commit()
