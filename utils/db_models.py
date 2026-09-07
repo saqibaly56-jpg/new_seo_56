@@ -350,6 +350,28 @@ def _migrate_existing_schema():
             if column_name not in existing_columns:
                 connection.execute(text(statement))
 
+    if inspect(engine).has_table("user_settings"):
+        user_settings_columns = {
+            column["name"] for column in inspect(engine).get_columns("user_settings")
+        }
+        user_settings_migrations = {
+            "airtable_api_key": "ALTER TABLE user_settings ADD COLUMN airtable_api_key TEXT",
+            "airtable_base_id": "ALTER TABLE user_settings ADD COLUMN airtable_base_id TEXT",
+            "airtable_table_name": "ALTER TABLE user_settings ADD COLUMN airtable_table_name TEXT DEFAULT 'Links'",
+            "active_format_mode": "ALTER TABLE user_settings ADD COLUMN active_format_mode TEXT DEFAULT 'default'",
+            "active_template_id": "ALTER TABLE user_settings ADD COLUMN active_template_id INTEGER",
+            "default_market": "ALTER TABLE user_settings ADD COLUMN default_market TEXT DEFAULT 'UK'",
+            "default_word_count": "ALTER TABLE user_settings ADD COLUMN default_word_count TEXT DEFAULT '1500'",
+            "default_tone": "ALTER TABLE user_settings ADD COLUMN default_tone TEXT DEFAULT 'professional'",
+            "default_keyword_density": "ALTER TABLE user_settings ADD COLUMN default_keyword_density TEXT DEFAULT '1.2'",
+            "theme_type": "ALTER TABLE user_settings ADD COLUMN theme_type TEXT DEFAULT 'standard'",
+            "seo_plugin": "ALTER TABLE user_settings ADD COLUMN seo_plugin TEXT DEFAULT 'none'",
+        }
+        with engine.begin() as connection:
+            for column_name, statement in user_settings_migrations.items():
+                if column_name not in user_settings_columns:
+                    connection.execute(text(statement))
+
 
 _migrate_existing_schema()
 
