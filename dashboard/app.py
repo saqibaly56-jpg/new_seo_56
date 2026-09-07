@@ -318,7 +318,16 @@ def trigger_run(config: RunConfig, user_id: int = Depends(get_current_user_id)):
         "dry_run": config.dry_run
     }
     
-    enqueue_job(job_id, payload)
+    if not enqueue_job(job_id, payload):
+        with SessionLocal() as db:
+            job_record = db.query(Job).filter(Job.id == job_id).first()
+            if job_record:
+                job_record.status = "FAILED"
+                job_record.current_stage = "QUEUE"
+                job_record.error_message = "Job queue is unavailable. Configure Redis before retrying."
+                job_record.failed_at = datetime.datetime.utcnow()
+                db.commit()
+        raise HTTPException(status_code=503, detail="Job queue is unavailable. Please configure Redis and retry.")
     log_audit_event(user_id, "JOB_TRIGGERED", "Job", job_id, details=config.dict())
     
     return {"message": "Job enqueued successfully", "job_id": job_id, "status": "QUEUED"}
@@ -603,8 +612,15 @@ def publish_draft(draft_id: int, action: str = "publish", user_id: int = Depends
         if not user_settings or not user_settings.get('wp_url'):
             raise HTTPException(status_code=400, detail="No WordPress site configured in user settings.")
             
-        wp_site = db.query(WordPressSite).filter(WordPressSite.user_id == user_id).first()
-        active_theme = wp_site.active_theme if wp_site and wp_site.active_theme else "appyn"
+        wp_site_query = db.query(WordPressSite).filter(WordPressSite.user_id == user_id)
+        if draft_record.site_id:
+            wp_site_query = wp_site_query.filter(WordPressSite.id == draft_record.site_id)
+        else:
+            wp_site_query = wp_site_query.filter(WordPressSite.site_url == user_settings.get('wp_url'))
+        wp_site = wp_site_query.first()
+        if draft_record.site_id and not wp_site:
+            raise HTTPException(status_code=403, detail="The draft's WordPress site is not available to this user.")
+        active_theme = wp_site.active_theme if wp_site and wp_site.active_theme else "unknown"
 
         site_profile = {
             "site_url": user_settings.get('wp_url', ''),
@@ -617,6 +633,18 @@ def publish_draft(draft_id: int, action: str = "publish", user_id: int = Depends
         
         doc_data = json.loads(draft_record.document_json)
         doc = ContentDocument(**doc_data)
+
+        from services.validation_service import validate_content_before_publish
+        validation = validate_content_before_publish(
+            doc,
+            user_id,
+            site_id=draft_record.site_id,
+            draft_id=draft_id,
+            job_id=draft_record.job_id,
+            strict=True,
+        )
+        if not validation.is_valid:
+            raise HTTPException(status_code=422, detail={"message": "Draft failed publish validation.", "errors": validation.errors, "warnings": validation.warnings})
         
         if active_theme and 'appyn' in active_theme.lower():
             from adapters.themes.appyn import AppynAdapter
@@ -646,6 +674,9 @@ def publish_draft(draft_id: int, action: str = "publish", user_id: int = Depends
         
         wp_publisher = WordPressPublisher(site_profile=site_profile)
         article_id = wp_publisher.publish(doc, image_assignments, post_status=action)
+
+        if wp_publisher.last_errors:
+            raise HTTPException(status_code=502, detail={"message": "WordPress post created but required metadata failed.", "article_id": article_id, "errors": wp_publisher.last_errors})
         
         if not article_id:
             raise HTTPException(status_code=500, detail="Failed to publish to WordPress. Check logs.")
@@ -725,6 +756,13 @@ async def add_link(
 
         featured_url = process_upload(featured_image) if featured_image else None
         desc_url = process_upload(description_image) if description_image else None
+        configured_settings = get_user_settings(user_id) or {}
+        with SessionLocal() as db:
+            configured_site = db.query(WordPressSite).filter(
+                WordPressSite.user_id == user_id,
+                WordPressSite.site_url == configured_settings.get("wp_url")
+            ).first()
+            selected_site_id = configured_site.id if configured_site else None
         
         with get_db_connection() as conn:
             conn.execute("""
@@ -741,6 +779,7 @@ async def add_link(
             new_job = Job(
                 id=job_id,
                 user_id=user_id,
+                site_id=selected_site_id,
                 game_name=game_name or "Pending Extraction",
                 provider=provider or "Pending Extraction",
                 target_market=market,
@@ -773,9 +812,19 @@ async def add_link(
             "target_market": market,
             "featured_image_url": featured_url,
             "description_image_url": desc_url,
+            "site_id": selected_site_id,
             "dry_run": False
         }
-        enqueue_job(job_id, payload)
+        if not enqueue_job(job_id, payload):
+            with SessionLocal() as db:
+                job_record = db.query(Job).filter(Job.id == job_id).first()
+                if job_record:
+                    job_record.status = "FAILED"
+                    job_record.current_stage = "QUEUE"
+                    job_record.error_message = "Job queue is unavailable. Configure Redis before retrying."
+                    job_record.failed_at = datetime.datetime.utcnow()
+                    db.commit()
+            raise HTTPException(status_code=503, detail="Job queue is unavailable. Please configure Redis and retry.")
         log_audit_event(user_id, "URL_LINK_QUEUED", "Link", job_id, details={"url": url})
         
         return {"message": "Target URL queued and automation job enqueued successfully!", "job_id": job_id}

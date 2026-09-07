@@ -15,9 +15,7 @@ def get_env_var(key: str, required: bool = True) -> str:
     """
     value = os.getenv(key)
     if required and not value:
-        if _is_production():
-            raise ValueError(f"CRITICAL ERROR: Required environment variable '{key}' is missing or empty in production.")
-        return ""
+        raise ValueError(f"CRITICAL ERROR: Required environment variable '{key}' is missing or empty.")
     return value or ""
 
 

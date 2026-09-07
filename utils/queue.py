@@ -43,6 +43,10 @@ def enqueue_job(job_id: str, payload: Dict[str, Any]) -> bool:
         except Exception as e:
             logger.error(f"Failed to enqueue job {job_id} into Redis: {e}")
             
+    if os.getenv("APP_ENV", "development").strip().lower() in {"production", "prod"}:
+        logger.error(f"Job {job_id} was not enqueued because Redis is unavailable in production.")
+        return False
+
     # Fallback to background thread execution if Redis is not running locally
     import threading
     from workers.job_worker import execute_job_task

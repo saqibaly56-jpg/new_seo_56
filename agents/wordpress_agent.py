@@ -21,6 +21,7 @@ class WordPressPublisher(BaseWordPressAdapter):
     """
     def publish(self, doc: ContentDocument, image_assignments: Optional[list] = None, post_status: str = "publish") -> Optional[str]:
         logger.info(f"Starting publish process for '{doc.title}' to {self.site_url}")
+        self.last_errors = []
 
         featured_image_id = None
         for key, path in list(doc.images.items()):
@@ -89,13 +90,16 @@ class WordPressPublisher(BaseWordPressAdapter):
         logger.info(f"Base post created with ID {post_id}")
 
         if seo_plugin == 'rankmath':
-            RankMathAdapter.apply_metadata(doc, post_id, self.site_url, self.auth, self.headers)
+            if not RankMathAdapter.apply_metadata(doc, post_id, self.site_url, self.auth, self.headers):
+                self.last_errors.append("Rank Math metadata update failed")
         elif seo_plugin == 'yoast':
-            YoastAdapter.apply_metadata(doc, post_id, self.site_url, self.auth, self.headers)
+            if not YoastAdapter.apply_metadata(doc, post_id, self.site_url, self.auth, self.headers):
+                self.last_errors.append("Yoast metadata update failed")
 
         active_theme = self.profile.get('active_theme', 'unknown').lower()
         if active_theme == 'appyn' or 'appyn' in active_theme:
-            AppynAdapter.apply_custom_fields(doc, post_id, self.site_url, self.auth, self.headers)
+            if not AppynAdapter.apply_custom_fields(doc, post_id, self.site_url, self.auth, self.headers):
+                self.last_errors.append("Appyn custom fields update failed")
 
         return post_id
 

@@ -4,6 +4,7 @@ import requests
 from PIL import Image
 from io import BytesIO
 from utils.logger import get_logger
+from utils.db import get_db_connection
 from agents.discovery_agent import Candidate
 
 logger = get_logger("image_agent")
@@ -19,6 +20,16 @@ class ImageAgent:
         data_dir = os.getenv('DATA_DIR', default_data_dir)
         self.tmp_dir = os.path.join(data_dir, 'tmp_images')
         os.makedirs(self.tmp_dir, exist_ok=True)
+
+    def get_licensed_image(self, game_name: str, provider: str, user_id: int, db_path: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        with get_db_connection(db_path) as conn:
+            row = conn.execute(
+                """SELECT file_path, license_type, license_notes
+                   FROM image_licenses
+                   WHERE user_id = ? AND game_name = ? AND provider = ?""",
+                (user_id, game_name, provider)
+            ).fetchone()
+            return dict(row) if row else None
         
     def _download_and_resize(self, url: str, filename: str) -> Optional[str]:
         if not url:

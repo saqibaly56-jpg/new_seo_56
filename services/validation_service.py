@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Dict, Any, List, Optional
 from core.universal_model import ContentDocument, ContentValidationResult
 from utils.db_models import SessionLocal, WordPressSite, ImageAsset, ImageAssignment, ContentTemplate, TemplateSection
@@ -7,7 +8,10 @@ def validate_content_before_publish(
     doc: ContentDocument,
     user_id: int,
     template_id: Optional[int] = None,
-    site_id: Optional[int] = None
+    site_id: Optional[int] = None,
+    draft_id: Optional[int] = None,
+    job_id: Optional[str] = None,
+    strict: bool = False,
 ) -> ContentValidationResult:
     """
     Executes the 12-Check Validation Engine prior to WordPress publishing.
@@ -62,7 +66,12 @@ def validate_content_before_publish(
 
     # Check 6 & 7: Image assignments reference valid image files on disk
     with SessionLocal() as db:
-        assignments = db.query(ImageAssignment).filter(ImageAssignment.user_id == user_id).all()
+        assignment_query = db.query(ImageAssignment).filter(ImageAssignment.user_id == user_id)
+        if draft_id:
+            assignment_query = assignment_query.filter(ImageAssignment.draft_id == draft_id)
+        elif job_id:
+            assignment_query = assignment_query.filter(ImageAssignment.job_id == job_id)
+        assignments = assignment_query.all()
         invalid_imgs = []
         orphaned_imgs = []
 
@@ -102,11 +111,23 @@ def validate_content_before_publish(
         else:
             warnings.append(f"Image assignment(s) reference sections not found in article: {', '.join(orphaned_imgs)}. Fallback rule 'do_not_publish' will prevent orphaned placement.")
 
+    content_parts = [doc.introduction or ""]
+    content_parts.extend(section.heading + " " + section.content for section in doc.sections)
+    content_parts.append(doc.conclusion or "")
+    content_text = re.sub(r"<[^>]+>", " ", " ".join(content_parts))
+    word_count = len(re.findall(r"\b\w+\b", content_text))
+    if word_count < 1500:
+        message = f"Article content is {word_count} words; at least 1500 words are required."
+        if strict:
+            errors.append(message)
+        else:
+            warnings.append(message)
+
     # Check 10: SEO fields valid
     if doc.seo_metadata and doc.seo_metadata.focus_keyword and doc.seo_metadata.meta_description:
         passed_checks += 1
     else:
-        warnings.append("SEO Metadata is incomplete (Focus Keyword or Meta Description missing).")
+        errors.append("SEO metadata must include a focus keyword and meta description.")
 
     # Check 12: WordPress Connection Available
     with SessionLocal() as db:

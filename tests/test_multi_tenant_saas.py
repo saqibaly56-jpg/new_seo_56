@@ -74,9 +74,9 @@ def test_fake_fact_maker_preservation():
     context = {"theme": "Candy"}
     empty_facts = {} # Facts missing!
     
-    with mock.patch("agents.content_agent.Groq") as mock_groq_class:
+    with mock.patch("agents.content_agent.OpenRouterClient") as mock_client_class:
         mock_groq_client = mock.Mock()
-        mock_groq_class.return_value = mock_groq_client
+        mock_client_class.return_value = mock_groq_client
         
         mock_response = mock.Mock()
         mock_response.choices = [
