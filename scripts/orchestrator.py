@@ -5,25 +5,31 @@ import traceback
 import time
 from utils.logger import get_logger
 from utils.db import init_db
-from agents.discovery_agent import DiscoveryAgent
+from agents.discovery_agent import DiscoveryAgent, Candidate
 from pipelines.content_pipeline import run_single_candidate
 from utils.db_models import SessionLocal, ContentDraft, WordPressSite
 
 logger = get_logger("orchestrator")
 
-def run(target_market: str, max_volume: int, dry_run: bool, user_id: int):
+def run(target_market: str, max_volume: int, dry_run: bool, user_id: int = 1):
     logger.info(f"Starting orchestration run (Market: {target_market}, Max Volume: {max_volume}, Dry Run: {dry_run}, User ID: {user_id})")
     init_db()
-    
+
     from dashboard.auth import get_user_settings
-    user_settings = get_user_settings(user_id)
+    user_settings = get_user_settings(user_id) if user_id else {}
     if not user_settings:
-        logger.error(f"Failed to find user settings for User ID: {user_id}")
-        return 0
+        logger.warning(f"No user settings found for User ID: {user_id}; continuing with defaults.")
+        user_settings = {}
     
     discovery = DiscoveryAgent(user_id=user_id, user_settings=user_settings)
     candidates = discovery.discover_candidates()
-    
+    if not candidates and dry_run:
+        logger.info("Dry run with no queued links detected; using safe default demo candidates.")
+        candidates = [
+            Candidate(game_name="Sweet Bonanza 1000", provider="Pragmatic Play", source_url="https://example.com/sweet-bonanza-1000"),
+            Candidate(game_name="Sugar Rush", provider="Pragmatic Play", source_url="https://example.com/sugar-rush"),
+        ]
+
     processed = 0
     metrics = Counter()
     

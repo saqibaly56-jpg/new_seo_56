@@ -1,8 +1,7 @@
 import json
 from dataclasses import dataclass
 from typing import List, Optional
-from groq import Groq
-from groq import Groq
+from utils.openrouter import OpenRouterClient
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from utils.logger import get_logger
@@ -25,8 +24,10 @@ class Candidate:
 class DiscoveryAgent:
     def __init__(self, user_id: int, user_settings: dict):
         self.user_id = user_id
-        self.groq_client = Groq(api_key=settings.groq_api_key)
-        self.groq_client = Groq(api_key=settings.groq_api_key)
+        self.openrouter_client = OpenRouterClient(
+            api_key=settings.openrouter_api_key,
+            model=settings.openrouter_model,
+        )
         
         # Ensure publish_history table exists in sqlite
         with get_db_connection(DB_PATH) as conn:
@@ -45,7 +46,7 @@ class DiscoveryAgent:
         
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=1, min=2, max=10))
     def _extract_game_info(self, url: str) -> dict:
-        """Uses Groq to extract game_name and provider from a URL"""
+        """Uses OpenRouter to extract game_name and provider from a URL"""
         prompt = (
             f"Given this URL and any visible page context: {url}\n"
             "Extract the game name and provider name. "
@@ -53,8 +54,8 @@ class DiscoveryAgent:
             "If you cannot determine a field, use null."
         )
         
-        response = self.groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+        response = self.openrouter_client.chat.completions.create(
+            model=settings.openrouter_model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
             response_format={"type": "json_object"}
@@ -101,13 +102,13 @@ class DiscoveryAgent:
             
             if not game_name or not provider:
                 try:
-                    logger.info(f"Extracting info from URL via Groq: {url}")
+                    logger.info(f"Extracting info from URL via OpenRouter: {url}")
                     extracted = self._extract_game_info(url)
                     game_name = game_name or extracted.get("game_name")
                     provider = provider or extracted.get("provider")
                 except Exception as e:
-                    logger.error(f"Groq extraction failed for {url}: {e}")
-                    self.update_status(record_id, "Failed", "Groq extraction failed")
+                    logger.error(f"OpenRouter extraction failed for {url}: {e}")
+                    self.update_status(record_id, "Failed", "OpenRouter extraction failed")
                     continue
             
             if not game_name or not provider:

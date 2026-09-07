@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS publish_history (
 
 CREATE TABLE IF NOT EXISTS trusted_facts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL DEFAULT 1,
     game_name TEXT NOT NULL,
     provider TEXT NOT NULL,
     rtp REAL,

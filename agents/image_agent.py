@@ -10,7 +10,14 @@ logger = get_logger("image_agent")
 
 class ImageAgent:
     def __init__(self):
-        self.tmp_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'tmp_images')
+        default_data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
+        if (
+            os.getenv('APP_ENV', 'development').strip().lower() in {'production', 'prod'}
+            or os.getenv('RAILWAY_ENVIRONMENT')
+        ):
+            default_data_dir = os.path.join('/tmp', 'seo_automation')
+        data_dir = os.getenv('DATA_DIR', default_data_dir)
+        self.tmp_dir = os.path.join(data_dir, 'tmp_images')
         os.makedirs(self.tmp_dir, exist_ok=True)
         
     def _download_and_resize(self, url: str, filename: str) -> Optional[str]:

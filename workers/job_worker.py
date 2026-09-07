@@ -145,8 +145,14 @@ def execute_job_task(job_id: str, payload: Dict[str, Any]):
     start_time = time.time()
     
     # Create isolated temp folder for job
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    job_temp_dir = os.path.join(base_dir, "data", "tmp", str(user_id), str(job_id))
+    default_data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+    if (
+        os.getenv("APP_ENV", "development").strip().lower() in {"production", "prod"}
+        or os.getenv("RAILWAY_ENVIRONMENT")
+    ):
+        default_data_dir = os.path.join("/tmp", "seo_automation")
+    data_dir = os.getenv("DATA_DIR", default_data_dir)
+    job_temp_dir = os.path.join(data_dir, "tmp", str(user_id), str(job_id))
     os.makedirs(job_temp_dir, exist_ok=True)
     
     update_worker_heartbeat("BUSY", current_job_id=job_id, current_stage="WORKER_ASSIGNED")
@@ -236,8 +242,8 @@ def execute_job_task(job_id: str, payload: Dict[str, Any]):
                     "sections": secs
                 }
 
-        # 4. Content Generation Stage (Calls Groq with prompt instructions)
-        emit_job_event(job_id, user_id, "CONTENT_GENERATION_STARTED", "CONTENT_GENERATION", "PROCESSING", "Generating 1500+ word review with Groq LLM.")
+        # 4. Content Generation Stage (Calls OpenRouter with prompt instructions)
+        emit_job_event(job_id, user_id, "CONTENT_GENERATION_STARTED", "CONTENT_GENERATION", "PROCESSING", "Generating 1500+ word review with OpenRouter LLM.")
         content_agent = ContentAgent()
         draft_doc = content_agent.draft_article(candidate, context, trusted_facts, template=template_dict)
         emit_job_event(job_id, user_id, "CONTENT_GENERATION_COMPLETED", "CONTENT_GENERATION", "PROCESSING", f"Article generated: '{draft_doc.title}'")
@@ -292,7 +298,7 @@ def execute_job_task(job_id: str, payload: Dict[str, Any]):
             cost = CostRecord(
                 user_id=user_id,
                 job_id=job_id,
-                category="groq_llm",
+                category="openrouter_llm",
                 amount=0.03,
                 description=f"Generated draft for {candidate.game_name}"
             )

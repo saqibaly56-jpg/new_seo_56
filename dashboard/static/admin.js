@@ -68,7 +68,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 { key: "DISCOVERY", label: "Discovery" },
                 { key: "RESEARCH", label: "Research" },
                 { key: "FACT_PROCESSING", label: "⚡ Fact Maker (Fake Facts)" },
-                { key: "CONTENT_GENERATION", label: "Groq Content" },
+                { key: "CONTENT_GENERATION", label: "OpenRouter Content" },
                 { key: "IMAGE_PROCESSING", label: "Image Processing" },
                 { key: "QUALITY_CHECK", label: "Quality Check" },
                 { key: "PENDING_REVIEW", label: "Pending Review" },
