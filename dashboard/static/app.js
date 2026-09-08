@@ -1335,6 +1335,23 @@ document.addEventListener("DOMContentLoaded", () => {
     // ===================================================================
     // DRAFTS PAGE
     // ===================================================================
+    function formatApiError(detail, fallback = "Request failed") {
+        if (!detail) return fallback;
+        if (typeof detail === "string") return detail;
+        if (typeof detail === "object") {
+            const parts = [];
+            if (detail.message) parts.push(detail.message);
+            if (Array.isArray(detail.errors)) parts.push(...detail.errors);
+            if (Array.isArray(detail.warnings) && detail.warnings.length) {
+                parts.push(`Warnings: ${detail.warnings.join("; ")}`);
+            }
+            if (detail.article_id) parts.push(`WordPress post ID: ${detail.article_id}`);
+            if (parts.length) return parts.join("\n");
+            try { return JSON.stringify(detail); } catch (_) { return fallback; }
+        }
+        return String(detail);
+    }
+
     async function loadDraftsPage() {
         const c = document.getElementById("drafts-container-page");
         if (!c) return;
@@ -1454,10 +1471,10 @@ document.addEventListener("DOMContentLoaded", () => {
                             // Reload to update status but delay so user sees success message
                             setTimeout(() => loadDraftsPage(), 5000);
                         } else {
-                            alert(d.detail || "Failed to publish");
+                            alert(formatApiError(d.detail, "Failed to send draft to WordPress"));
                         }
                     } catch (e) { 
-                        alert("Failed to publish");
+                        alert(formatApiError(e && e.message, "Failed to send draft to WordPress"));
                         btn.innerHTML = oldText;
                         btn.disabled = false;
                     }
