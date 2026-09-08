@@ -2,7 +2,6 @@ import logging
 import os
 import sys
 from pythonjsonlogger import jsonlogger
-from config.settings import settings
 
 class SensitiveDataFilter(logging.Filter):
     """Filter to redact sensitive API keys from logs"""
@@ -10,7 +9,7 @@ class SensitiveDataFilter(logging.Filter):
         super().__init__()
         self.sensitive_strings = [
             os.getenv("OPENROUTER_API_KEY", ""),
-            settings.wp_app_password
+            os.getenv("WP_APP_PASSWORD", "")
         ]
         # Remove empty strings to avoid replacing everything
         self.sensitive_strings = [s for s in self.sensitive_strings if s]
@@ -28,7 +27,6 @@ def get_logger(agent_name: str) -> logging.Logger:
     Logs are structured as JSON and sent to stdout for container platforms.
     """
     logger = logging.getLogger(agent_name)
-    
     # Only configure if it doesn't already have handlers to avoid duplicates
     if not logger.handlers:
         logger.setLevel(logging.INFO)
