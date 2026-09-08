@@ -641,7 +641,7 @@ def publish_draft(draft_id: int, action: str = "publish", user_id: int = Depends
             site_id=draft_record.site_id,
             draft_id=draft_id,
             job_id=draft_record.job_id,
-            strict=True,
+            strict=action == "publish",
         )
         if not validation.is_valid:
             raise HTTPException(status_code=422, detail={"message": "Draft failed publish validation.", "errors": validation.errors, "warnings": validation.warnings})
