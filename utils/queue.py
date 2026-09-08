@@ -8,7 +8,24 @@ from utils.logger import get_logger
 
 logger = get_logger("queue_utils")
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+def get_redis_url() -> str:
+    """Return the configured Redis URL, supporting Railway component variables."""
+    redis_url = os.getenv("REDIS_URL", "").strip()
+    if redis_url and "your_redis_private_host" not in redis_url and "my-redis.internal" not in redis_url:
+        return redis_url
+
+    redis_host = os.getenv("REDISHOST", "").strip()
+    redis_port = os.getenv("REDISPORT", "6379").strip()
+    redis_user = os.getenv("REDISUSER", "default").strip()
+    redis_password = os.getenv("REDISPASSWORD") or os.getenv("REDIS_PASSWORD")
+    if redis_host and redis_password:
+        from urllib.parse import quote
+        return f"redis://{quote(redis_user, safe='')}:{quote(redis_password, safe='')}@{redis_host}:{redis_port}/0"
+
+    return redis_url or "redis://localhost:6379/0"
+
+
+REDIS_URL = get_redis_url()
 
 _redis_conn = None
 _rq_queue = None

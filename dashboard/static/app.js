@@ -110,6 +110,25 @@ document.addEventListener("DOMContentLoaded", () => {
     // ===================================================================
     // TAB SWITCHER
     // ===================================================================
+    let jobsPollTimer = null;
+
+    function stopJobsPolling() {
+        if (jobsPollTimer) {
+            clearInterval(jobsPollTimer);
+            jobsPollTimer = null;
+        }
+    }
+
+    function startJobsPolling() {
+        stopJobsPolling();
+        jobsPollTimer = setInterval(() => {
+            const home = document.getElementById("view-home");
+            if (home && !home.classList.contains("hidden")) {
+                loadJobsHome();
+            }
+        }, 30000);
+    }
+
     function switchTab(viewName, navBtn) {
         tabViews.forEach(v => v.classList.add("hidden"));
         const target = document.getElementById(`view-${viewName}`);
@@ -120,12 +139,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (navBtn) navBtn.classList.add("active");
         window.scrollTo({ top: 0, behavior: "smooth" });
 
-        if      (viewName === "home")      { loadUsage(); loadJobsHome(); }
-        else if (viewName === "create")    { initCreateView(); }
-        else if (viewName === "templates") { loadFormatsListView(); }
-        else if (viewName === "drafts")    { loadDraftsPage(); }
-        else if (viewName === "history")   { loadHistory(); }
-        else if (viewName === "settings")  { loadSettings(); }
+        if      (viewName === "home")      { loadUsage(); loadJobsHome(); startJobsPolling(); }
+        else if (viewName === "create")    { stopJobsPolling(); initCreateView(); }
+        else if (viewName === "templates") { stopJobsPolling(); loadFormatsListView(); }
+        else if (viewName === "drafts")    { stopJobsPolling(); loadDraftsPage(); }
+        else if (viewName === "history")   { stopJobsPolling(); loadHistory(); }
+        else if (viewName === "settings")  { stopJobsPolling(); loadSettings(); }
     }
 
     if (navHome)      navHome.addEventListener("click",      () => switchTab("home",      navHome));
@@ -1592,11 +1611,14 @@ document.addEventListener("DOMContentLoaded", () => {
     loadTemplates().then(() => loadActiveFormat());
     checkRole();
 
-    // Auto-refresh jobs every 5 seconds when home tab is active
-    setInterval(() => {
+    document.addEventListener("visibilitychange", () => {
         const home = document.getElementById("view-home");
-        if (home && !home.classList.contains("hidden")) loadJobsHome();
-    }, 5000);
+        if (document.hidden) {
+            stopJobsPolling();
+        } else if (home && !home.classList.contains("hidden")) {
+            startJobsPolling();
+        }
+    });
 
 }); // end DOMContentLoaded
 
