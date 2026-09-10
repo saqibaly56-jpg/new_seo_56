@@ -21,7 +21,11 @@ os.makedirs(DATA_DIR, exist_ok=True)
 DB_PATH = os.path.join(DATA_DIR, 'history.db')
 SCHEMA_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'schema.sql')
 DATABASE_URL = os.getenv("DATABASE_URL", "")
-USE_POSTGRES = DATABASE_URL.startswith(("postgresql://", "postgres://"))
+
+def is_postgres_url(database_url: str) -> bool:
+    return database_url.lower().startswith(("postgresql://", "postgres://", "postgresql+"))
+
+USE_POSTGRES = is_postgres_url(DATABASE_URL)
 
 
 class _SQLAlchemyCursor:

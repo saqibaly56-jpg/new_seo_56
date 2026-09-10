@@ -3,7 +3,7 @@ import pytest
 from unittest import mock
 from dashboard.auth import hash_password, verify_password
 from utils.crypto import encrypt_credential, decrypt_credential
-from utils.db import get_db_connection
+from utils.db import get_db_connection, is_postgres_url
 from adapters.wp_base import BaseWordPressAdapter
 
 def test_pbkdf2_password_hashing():
@@ -41,6 +41,11 @@ def test_sqlite_wal_mode():
         cursor.execute("PRAGMA journal_mode;")
         mode = cursor.fetchone()[0]
         assert mode.lower() == "wal"
+
+def test_postgres_url_detection_supports_sqlalchemy_driver_urls():
+    assert is_postgres_url("postgresql://user:pass@host/db") is True
+    assert is_postgres_url("postgresql+psycopg2://user:pass@host/db") is True
+    assert is_postgres_url("sqlite:///history.db") is False
 
 def test_wp_base_non_json_handling():
     adapter = BaseWordPressAdapter({
