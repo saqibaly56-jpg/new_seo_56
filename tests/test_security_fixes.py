@@ -28,6 +28,9 @@ def test_credential_encryption():
     decrypted = decrypt_credential(encrypted)
     assert decrypted == secret
 
+    tampered = encrypted[:-2] + ("aa" if encrypted[-2:] != "aa" else "bb")
+    assert decrypt_credential(tampered) == ""
+
 def test_legacy_unencrypted_credential_fallback():
     raw_secret = "legacy_plain_password"
     assert decrypt_credential(raw_secret) == raw_secret

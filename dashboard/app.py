@@ -69,8 +69,9 @@ class SettingsUpdate(BaseModel):
 # Ensure seed admin user exists only in non-production local/dev environments.
 def seed_admin_user():
     try:
-        app_env = os.getenv("APP_ENV", "development").strip().lower()
-        if app_env in {"production", "prod"}:
+        configured_app_env = os.getenv("APP_ENV")
+        app_env = (configured_app_env or "").strip().lower()
+        if not configured_app_env or app_env in {"production", "prod"} or os.getenv("RAILWAY_ENVIRONMENT"):
             return
 
         with SessionLocal() as db:
@@ -1171,10 +1172,10 @@ def list_user_images(user_id: int = Depends(get_current_user_id)):
         ]
 
 @app.get("/api/images/{image_id}/file")
-def serve_image_file(image_id: str):
+def serve_image_file(image_id: str, user_id: int = Depends(get_current_user_id)):
     from fastapi.responses import FileResponse
     with SessionLocal() as db:
-        asset = db.query(ImageAsset).filter(ImageAsset.id == image_id).first()
+        asset = db.query(ImageAsset).filter(ImageAsset.id == image_id, ImageAsset.user_id == user_id).first()
         if not asset or not os.path.exists(asset.file_path):
             raise HTTPException(status_code=404, detail="Image file not found")
         return FileResponse(asset.file_path, media_type=asset.mime_type)
@@ -1209,6 +1210,30 @@ def assign_image_to_section(payload: ImageAssignmentCreate, user_id: int = Depen
         asset = db.query(ImageAsset).filter(ImageAsset.id == payload.image_id, ImageAsset.user_id == user_id).first()
         if not asset:
             raise HTTPException(status_code=404, detail="Image asset not found")
+
+        if payload.template_id is not None:
+            try:
+                template_id = int(payload.template_id)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="Invalid template ID")
+            template = db.query(ContentTemplate).filter(
+                ContentTemplate.id == template_id, ContentTemplate.user_id == user_id
+            ).first()
+            if not template:
+                raise HTTPException(status_code=404, detail="Template not found")
+            if not db.query(TemplateSection).filter(
+                TemplateSection.id == payload.section_id, TemplateSection.template_id == template_id
+            ).first():
+                raise HTTPException(status_code=404, detail="Template section not found")
+
+        if payload.job_id is not None and not db.query(Job).filter(
+            Job.id == payload.job_id, Job.user_id == user_id
+        ).first():
+            raise HTTPException(status_code=404, detail="Job not found")
+        if payload.draft_id is not None and not db.query(ContentDraft).filter(
+            ContentDraft.id == payload.draft_id, ContentDraft.user_id == user_id
+        ).first():
+            raise HTTPException(status_code=404, detail="Draft not found")
             
         assignment = db.query(ImageAssignment).filter(
             ImageAssignment.user_id == user_id,
@@ -1248,6 +1273,8 @@ def assign_image_to_section(payload: ImageAssignmentCreate, user_id: int = Depen
 @app.post("/api/images/link-job")
 def link_images_to_job(payload: LinkJobImagesRequest, user_id: int = Depends(get_current_user_id)):
     with SessionLocal() as db:
+        if not db.query(Job).filter(Job.id == payload.job_id, Job.user_id == user_id).first():
+            raise HTTPException(status_code=404, detail="Job not found")
         for img_id in payload.image_ids:
             assignment = db.query(ImageAssignment).filter(
                 ImageAssignment.user_id == user_id,

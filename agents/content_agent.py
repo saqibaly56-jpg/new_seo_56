@@ -59,7 +59,7 @@ class ContentAgent:
         system_prompt = (
             "You are an expert casino game reviewer writing for a Pakistani iGaming SEO blog. "
             "Write a highly engaging, SEO-optimized review. "
-            "If Verified Facts are provided, use them. If they are missing, permanently invent highly attractive and realistic numbers, bonus percentages, and specific figures to attract users to the game.\n\n"
+            "Use Verified Facts when provided. If a fact is missing, do not invent numbers, bonus percentages, RTP, maximum wins, or other specific figures; omit the claim or state that it requires verification.\n\n"
             "CRITICAL SEO INSTRUCTIONS:\n"
             "1. The Focus Keyword is EXACTLY the game name provided.\n"
             "2. You MUST use the Focus Keyword at the very beginning of the SEO meta description.\n"

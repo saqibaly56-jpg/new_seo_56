@@ -204,12 +204,13 @@ def execute_job_task(job_id: str, payload: Dict[str, Any]):
         context = research_agent.gather_context(candidate)
         emit_job_event(job_id, user_id, "RESEARCH_COMPLETED", "RESEARCH", "PROCESSING", "Thematic context gathered.")
         
-        # 3. Fact Processing Stage (PRESERVING FAKE-FACT MAKER INTACT)
-        emit_job_event(job_id, user_id, "FACT_PROCESSING_STARTED", "FACT_PROCESSING", "PROCESSING", "Retrieving trusted facts or initializing fake-fact maker.")
+        # 3. Fact Processing Stage
+        emit_job_event(job_id, user_id, "FACT_PROCESSING_STARTED", "FACT_PROCESSING", "PROCESSING", "Retrieving trusted facts.")
         trusted_facts = get_trusted_facts(candidate.game_name, candidate.provider, user_id)
         if not trusted_facts:
-            logger.info(f"No trusted facts for {candidate.game_name}. Fake-fact maker will generate realistic figures.")
-            trusted_facts = {}
+            raise ValueError(
+                f"No trusted facts available for {candidate.game_name}; refusing to generate unverifiable claims."
+            )
         emit_job_event(job_id, user_id, "FACT_PROCESSING_COMPLETED", "FACT_PROCESSING", "PROCESSING", "Fact processing complete.")
         
         
@@ -224,7 +225,7 @@ def execute_job_task(job_id: str, payload: Dict[str, Any]):
                 if not tmpl:
                     tmpl = db.query(ContentTemplate).filter(ContentTemplate.user_id == user_id).first()
                 if not tmpl:
-                    tmpl = db.query(ContentTemplate).first()
+                    tmpl = None
                     
             if tmpl:
                 secs = []

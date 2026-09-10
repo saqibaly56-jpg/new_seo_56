@@ -95,7 +95,15 @@ def get_db_connection(db_path=None):
 def init_db(db_path=DB_PATH, schema_path=SCHEMA_PATH):
     """Initialize the SQLite database with the schema and auto-migrate new columns."""
     if USE_POSTGRES and db_path == DB_PATH:
-        logger.info("Using DATABASE_URL database; SQLAlchemy handles schema initialization and migrations.")
+        from utils.db_models import engine
+        schema_file = os.path.join(os.path.dirname(schema_path), "schema.supabase.sql")
+        if os.path.exists(schema_file):
+            with open(schema_file, encoding="utf-8") as file:
+                statements = [statement.strip() for statement in file.read().split(";") if statement.strip()]
+            with engine.begin() as connection:
+                for statement in statements:
+                    connection.execute(text(statement))
+        logger.info("Using DATABASE_URL database; SQLAlchemy and raw schema tables initialized.")
         return
 
     with get_db_connection(db_path) as conn:

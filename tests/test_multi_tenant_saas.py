@@ -6,11 +6,12 @@ from unittest import mock
 from fastapi.testclient import TestClient
 
 from dashboard.app import app
-from utils.db_models import SessionLocal, User, Job, JobEvent, Worker, UserSettings, ContentDraft, Subscription
+from utils.db_models import SessionLocal, User, Job, JobEvent, Worker, UserSettings, ContentDraft, Subscription, ImageAsset
 from dashboard.auth import hash_password, generate_session_token
 from agents.content_agent import ContentAgent
 from agents.discovery_agent import Candidate
 from services.subscription_service import check_user_quota
+from utils.db import get_db_connection
 
 client = TestClient(app)
 
@@ -65,9 +66,9 @@ def setup_test_users():
             "admin_id": admin.id
         }
 
-def test_fake_fact_maker_preservation():
+def test_missing_facts_do_not_enable_fabricated_claims():
     """
-    Verifies that the existing fake-fact generation system prompt and logic remain fully intact.
+    Verifies that missing facts are not passed to the model as permission to fabricate claims.
     """
     agent = ContentAgent()
     candidate = Candidate(game_name="Sweet Bonanza", provider="Pragmatic Play", source_url="https://example.com")
@@ -95,9 +96,9 @@ def test_fake_fact_maker_preservation():
         assert doc is not None
         assert "Sweet Bonanza" in doc.title
         
-        # Verify prompt instructed fake fact generation
+        # The agent must explicitly prohibit fabricated factual figures.
         system_prompt_arg = mock_groq_client.chat.completions.create.call_args[1]["messages"][0]["content"]
-        assert "permanently invent highly attractive and realistic numbers" in system_prompt_arg
+        assert "do not invent" in system_prompt_arg.lower()
 
 def test_tenant_data_isolation(setup_test_users):
     """
@@ -141,6 +142,32 @@ def test_admin_rbac_protection(setup_test_users):
     client.cookies.set("session_token", token_a)
     res = client.get("/api/admin/stats")
     assert res.status_code == 403 # Admin access denied!
+
+def test_image_file_and_job_link_are_tenant_scoped(setup_test_users, tmp_path):
+    user_a_id = setup_test_users["user_a_id"]
+    user_b_id = setup_test_users["user_b_id"]
+    job_b_id = f"job-userb-image-{uuid.uuid4().hex[:6]}"
+    image_path = tmp_path / "private.jpg"
+    image_path.write_bytes(b"not-a-real-image")
+
+    with SessionLocal() as db:
+        db.add(Job(id=job_b_id, user_id=user_b_id, game_name="Private", provider="Provider", status="QUEUED"))
+        db.add(ImageAsset(
+            id=f"img-{uuid.uuid4().hex[:12]}", user_id=user_b_id, filename="private.jpg",
+            file_path=str(image_path), mime_type="image/jpeg", width=1, height=1, file_size=16
+        ))
+        db.commit()
+        image_id = db.query(ImageAsset).filter(ImageAsset.user_id == user_b_id).order_by(ImageAsset.created_at.desc()).first().id
+
+    token_a = generate_session_token()
+    with get_db_connection() as conn:
+        conn.execute("INSERT INTO sessions (token, user_id) VALUES (?, ?)", (token_a, user_a_id))
+        conn.commit()
+    client.cookies.set("session_token", token_a)
+
+    assert client.get(f"/api/images/{image_id}/file").status_code == 404
+    response = client.post("/api/images/link-job", json={"job_id": job_b_id, "image_ids": [image_id]})
+    assert response.status_code == 404
 
 def test_subscription_quota_enforcement(setup_test_users):
     """

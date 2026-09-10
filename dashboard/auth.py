@@ -4,7 +4,7 @@ from typing import Optional, Dict
 
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import APIKeyCookie
-from utils.db import get_db_connection
+from utils.db import get_db_connection, USE_POSTGRES
 
 cookie_scheme = APIKeyCookie(name="session_token", auto_error=False)
 
@@ -43,7 +43,19 @@ def get_current_user_id(session_token: str = Depends(cookie_scheme)) -> int:
         )
     
     with get_db_connection() as conn:
-        result = conn.execute("SELECT user_id FROM sessions WHERE token = ?", (session_token,))
+        expiry_clause = (
+            "sessions.created_at >= CURRENT_TIMESTAMP - INTERVAL '7 days'"
+            if USE_POSTGRES else
+            "sessions.created_at >= datetime('now', '-7 days')"
+        )
+        result = conn.execute(f"""
+            SELECT sessions.user_id
+            FROM sessions
+            JOIN users ON users.id = sessions.user_id
+            WHERE sessions.token = ?
+              AND users.is_active = 1
+              AND {expiry_clause}
+        """, (session_token,))
         row = result.fetchone()
         
         if not row:
