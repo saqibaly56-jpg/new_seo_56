@@ -835,12 +835,24 @@ document.addEventListener("DOMContentLoaded", () => {
     async function loadTemplates() {
         try {
             const res  = await fetch("/api/templates");
-            const data = await res.json();
-            if (!Array.isArray(data)) return;
+            const responseText = await res.text();
+            let data;
+            try {
+                data = responseText ? JSON.parse(responseText) : [];
+            } catch (_) {
+                throw new Error(`Template request returned invalid JSON (HTTP ${res.status})`);
+            }
+            if (!res.ok) throw new Error(data.detail || data.error || `Template request failed (HTTP ${res.status})`);
+            if (!Array.isArray(data)) throw new Error("Template response was not a list");
             userTemplates  = data;
             activeTemplate = data.find(t => t.is_default) || data[0] || null;
             updateDevDiagnostics();
-        } catch (e) { console.error("Failed to load templates", e); }
+        } catch (e) {
+            console.error("Failed to load templates", e);
+            if (formatsListContainer) {
+                formatsListContainer.innerHTML = `<p class="error-msg">Unable to load templates: ${e instanceof Error ? e.message : String(e)}</p>`;
+            }
+        }
     }
 
     // ===================================================================

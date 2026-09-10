@@ -181,6 +181,9 @@ def register_user(user: UserCreate, request: Request):
             db.add(new_settings)
             db.add(new_sub)
             db.commit()
+
+            from services.template_service import seed_default_template
+            seed_default_template(new_user.id)
             
             log_audit_event(new_user.id, "USER_REGISTERED", "User", str(new_user.id), request.client.host if request.client else None)
             return {"message": "User registered successfully"}
