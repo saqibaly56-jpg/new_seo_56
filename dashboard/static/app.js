@@ -201,45 +201,6 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (e) { console.error("Failed to load settings", e); }
     }
 
-    const wpSetupForm   = document.getElementById("setup-form");
-    const wpSetupStatus = document.getElementById("setup-status");
-    if (wpSetupForm) {
-        wpSetupForm.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const payload = {
-                wp_url:        document.getElementById("set_wp_url")?.value?.trim(),
-                wp_username:   document.getElementById("set_wp_username")?.value?.trim(),
-                wp_app_password: document.getElementById("set_wp_password")?.value?.trim(),
-                theme_type:    document.getElementById("set_theme_type")?.value,
-                seo_plugin:    document.getElementById("set_seo_plugin")?.value
-            };
-            try {
-                const res = await fetch("/api/settings", {
-                    method:  "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body:    JSON.stringify(payload)
-                });
-                if (wpSetupStatus) {
-                    if (res.ok) {
-                        wpSetupStatus.textContent = "✓ WordPress settings saved successfully!";
-                        wpSetupStatus.className   = "success-msg";
-                    } else {
-                        wpSetupStatus.textContent = "Failed to save settings.";
-                        wpSetupStatus.className   = "error-msg";
-                    }
-                    wpSetupStatus.classList.remove("hidden");
-                    setTimeout(() => wpSetupStatus.classList.add("hidden"), 3500);
-                }
-            } catch (err) {
-                if (wpSetupStatus) {
-                    wpSetupStatus.textContent = "Error: " + err.message;
-                    wpSetupStatus.className   = "error-msg";
-                    wpSetupStatus.classList.remove("hidden");
-                }
-            }
-        });
-    }
-
     // ===================================================================
     // COLLAPSIBLE SECTIONS (Home Dashboard)
     // ===================================================================
@@ -1577,12 +1538,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
                 const status = document.getElementById("setup-status");
                 if (status) {
+                    const responseText = await res.text();
+                    let responseData = {};
+                    try { responseData = responseText ? JSON.parse(responseText) : {}; } catch (_) {}
                     status.className = res.ok ? "success-msg" : "error-msg";
-                    status.textContent = res.ok ? "✓ Settings saved!" : "Failed to save settings.";
+                    status.textContent = res.ok
+                        ? "✓ Settings saved!"
+                        : (responseData.detail || responseData.error || `Failed to save settings (HTTP ${res.status}).`);
                     status.classList.remove("hidden");
                     setTimeout(() => status.classList.add("hidden"), 3000);
                 }
-            } catch (err) {}
+            } catch (err) {
+                const status = document.getElementById("setup-status");
+                if (status) {
+                    status.className = "error-msg";
+                    status.textContent = `Failed to save settings: ${err instanceof Error ? err.message : String(err)}`;
+                    status.classList.remove("hidden");
+                }
+            }
         });
     }
 
