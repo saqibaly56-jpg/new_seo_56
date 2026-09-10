@@ -208,8 +208,17 @@ def execute_job_task(job_id: str, payload: Dict[str, Any]):
         emit_job_event(job_id, user_id, "FACT_PROCESSING_STARTED", "FACT_PROCESSING", "PROCESSING", "Retrieving trusted facts.")
         trusted_facts = get_trusted_facts(candidate.game_name, candidate.provider, user_id)
         if not trusted_facts:
-            raise ValueError(
-                f"No trusted facts available for {candidate.game_name}; refusing to generate unverifiable claims."
+            logger.warning(
+                "No trusted facts available for %s; continuing without unverifiable numeric claims.",
+                candidate.game_name,
+            )
+            emit_job_event(
+                job_id,
+                user_id,
+                "FACTS_UNAVAILABLE",
+                "FACT_PROCESSING",
+                "WARNING",
+                "No verified facts found. Unsupported factual figures will be omitted or flagged for review.",
             )
         emit_job_event(job_id, user_id, "FACT_PROCESSING_COMPLETED", "FACT_PROCESSING", "PROCESSING", "Fact processing complete.")
         
