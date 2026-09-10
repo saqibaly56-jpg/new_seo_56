@@ -832,7 +832,11 @@ async def add_link(
     except HTTPException:
         raise
     except Exception as e:
-        return {"error": f"Failed to queue link: {str(e)}"}
+        logger.exception("Failed to queue link for user %s", user_id)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Failed to queue link. Check the server logs for details."}
+        )
 
 @app.get("/api/links/status")
 def get_links_status(user_id: int = Depends(get_current_user_id)):

@@ -1151,10 +1151,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
             try {
                 const res  = await fetch("/api/links", { method: "POST", body: fd });
-                const data = await res.json();
+                const responseText = await res.text();
+                let data;
+                try {
+                    data = responseText ? JSON.parse(responseText) : {};
+                } catch (parseError) {
+                    throw new Error(`Server returned HTTP ${res.status} with a non-JSON response: ${responseText.slice(0, 240)}`);
+                }
+                if (!res.ok) {
+                    throw new Error(data.detail || data.error || `Request failed with HTTP ${res.status}`);
+                }
                 
                 if (data.job_id && fastTrackUploadedImages.length > 0) {
-                    await fetch("/api/images/link-job", {
+                    const imageLinkResponse = await fetch("/api/images/link-job", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
@@ -1162,11 +1171,17 @@ document.addEventListener("DOMContentLoaded", () => {
                             image_ids: fastTrackUploadedImages.map(img => img.id)
                         })
                     });
+                    if (!imageLinkResponse.ok) {
+                        const imageLinkText = await imageLinkResponse.text();
+                        let imageLinkData = {};
+                        try { imageLinkData = imageLinkText ? JSON.parse(imageLinkText) : {}; } catch (_) { /* Keep the primary submission result. */ }
+                        console.warn("Image linking failed after job creation", imageLinkResponse.status, imageLinkData);
+                    }
                 }
                 
                 alert(data.message || "Job queued successfully!");
                 switchTab("home", navHome);
-            } catch (e) { alert("Submission failed: " + e); }
+            } catch (e) { alert("Submission failed: " + (e instanceof Error ? e.message : String(e))); }
             finally {
                 btnFinalPublish.disabled    = false;
                 btnFinalPublish.textContent = "🚀 Start Automation & Publish";
