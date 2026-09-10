@@ -47,6 +47,12 @@ def test_postgres_url_detection_supports_sqlalchemy_driver_urls():
     assert is_postgres_url("postgresql+psycopg2://user:pass@host/db") is True
     assert is_postgres_url("sqlite:///history.db") is False
 
+def test_session_query_uses_postgres_boolean_syntax():
+    from pathlib import Path
+    auth_source = Path("dashboard/auth.py").read_text(encoding="utf-8")
+    assert "users.is_active IS TRUE" in auth_source
+    assert "users.is_active = 1" not in auth_source
+
 def test_wp_base_non_json_handling():
     adapter = BaseWordPressAdapter({
         'site_url': 'https://example.com',

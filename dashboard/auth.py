@@ -54,7 +54,7 @@ def get_current_user_id(session_token: str = Depends(cookie_scheme)) -> int:
                 FROM sessions
                 JOIN users ON users.id = sessions.user_id
                 WHERE sessions.token = ?
-                  AND users.is_active = 1
+                  AND users.is_active IS TRUE
                   AND {expiry_clause}
             """, (session_token,))
             row = result.fetchone()
