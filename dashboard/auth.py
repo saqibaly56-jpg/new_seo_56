@@ -42,29 +42,35 @@ def get_current_user_id(session_token: str = Depends(cookie_scheme)) -> int:
             detail="Not authenticated"
         )
     
-    with get_db_connection() as conn:
-        expiry_clause = (
-            "sessions.created_at >= CURRENT_TIMESTAMP - INTERVAL '7 days'"
-            if USE_POSTGRES else
-            "sessions.created_at >= datetime('now', '-7 days')"
-        )
-        result = conn.execute(f"""
-            SELECT sessions.user_id
-            FROM sessions
-            JOIN users ON users.id = sessions.user_id
-            WHERE sessions.token = ?
-              AND users.is_active = 1
-              AND {expiry_clause}
-        """, (session_token,))
-        row = result.fetchone()
-        
-        if not row:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired session"
+    try:
+        with get_db_connection() as conn:
+            expiry_clause = (
+                "sessions.created_at >= CURRENT_TIMESTAMP - INTERVAL '7 days'"
+                if USE_POSTGRES else
+                "sessions.created_at >= datetime('now', '-7 days')"
             )
-            
-        return row['user_id']
+            result = conn.execute(f"""
+                SELECT sessions.user_id
+                FROM sessions
+                JOIN users ON users.id = sessions.user_id
+                WHERE sessions.token = ?
+                  AND users.is_active = 1
+                  AND {expiry_clause}
+            """, (session_token,))
+            row = result.fetchone()
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service is temporarily unavailable",
+        )
+
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired session"
+        )
+
+    return row['user_id']
 
 def get_current_user(user_id: int = Depends(get_current_user_id)):
     from utils.db_models import SessionLocal, User

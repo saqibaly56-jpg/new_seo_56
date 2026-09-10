@@ -28,6 +28,18 @@ logger = get_logger("dashboard")
 init_db()
 app = FastAPI(title="SEO Automation Multi-Tenant SaaS Engine")
 
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    request_id = uuid.uuid4().hex[:12]
+    logger.exception("Unhandled request error %s for %s %s", request_id, request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error. Please retry or contact support.",
+            "request_id": request_id,
+        },
+    )
+
 # Paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _default_data_dir = os.path.join(BASE_DIR, 'data')
@@ -835,10 +847,14 @@ async def add_link(
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Failed to queue link for user %s", user_id)
+        request_id = uuid.uuid4().hex[:12]
+        logger.exception("Failed to queue link %s for user %s", request_id, user_id)
         return JSONResponse(
             status_code=500,
-            content={"detail": "Failed to queue link. Check the server logs for details."}
+            content={
+                "detail": "Failed to queue link. Please retry or contact support.",
+                "request_id": request_id,
+            }
         )
 
 @app.get("/api/links/status")
